@@ -48,7 +48,24 @@ class Vehicle {
   // comportement de fuite, inverse de seek
   flee(target) {
     // inverse de seek !
-    return this.seek(target).mult(-1);
+    //return this.seek(target).mult(-1);
+
+    //vecteur allant du véhicule vers la cible
+    let desiredSpeed = p5.Vector.sub(target, this.pos);
+
+    // on lui donne la norme maxSpeed
+    desiredSpeed.setMag(this.maxSpeed);
+
+    // oninverse la vitesse désirée pour fuir
+    desiredSpeed.mult(-1);
+
+    // formule classique du steering : force = desiredSpeed - currentSpeed
+    let force = p5.Vector.sub(desiredSpeed, this.vel);
+
+    // on limite la force 
+    force.limit(this.maxForce);
+
+    return force;
   }
 
   // --------------------------------------------

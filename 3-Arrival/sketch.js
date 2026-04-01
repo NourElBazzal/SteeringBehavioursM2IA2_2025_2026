@@ -11,7 +11,7 @@ let bg;
 // Appelée avant de démarrer l'animation
 function preload() {
   // en général on charge des images, des fontes de caractères etc.
-  font = loadFont('./assets/inconsolata.otf');
+  font = loadFont("./assets/inconsolata.otf");
 }
 
 function setup() {
@@ -39,6 +39,12 @@ function setup() {
 
   // La cible, ce sera la position de la souris
   //target = createVector(random(width), random(height));
+
+  // On générer une chaine de caractères et on va utiliser la fonction text2points
+  // pour obtenir une liste de points à partir de cette chaine de caractères
+  // Paramètres = texte, position x, position y, taille du texte,
+  // paramètres optionnels (sampleFactor = 0.1, simplifyThreshold = 0)
+  points = font.textToPoints("IA2", 100, 400, 512, { sampleFactor: 0.03 });
 
   // on cree des vehicules, autant que de points
   //creerVehicules(20);

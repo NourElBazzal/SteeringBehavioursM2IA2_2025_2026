@@ -69,34 +69,46 @@ class Snake {
    * Draw the snake: body ribbon first, then segment circles on top.
    */
   show() {
-    let n = this.segments.length;
+    // Utiliser la couleur arc-en-ciel assignée
+    stroke(this.rainbowColor);
+    strokeWeight(2);
+    fill(this.rainbowColor);
+    let currentRadius = this.r * this.sizeRatio;
+    circle(this.pos.x, this.pos.y, currentRadius * 2);
+  }
+}
 
-    // ── Ribbon / outline between segments ─────────────────────────
-    this._drawRibbon();
-
-    // ── Segments (back to front so head is on top) ─────────────────
-    for (let i = n - 1; i >= 0; i--) {
-      this.segments[i].show(n);
+// Snake - classe principale, sous-classe de Vehicle
+class Snake extends Vehicle {
+  constructor(x, y, bodyLength = 10) {
+    super(x, y);
+    this.head = new HeadSnake(x, y);
+    this.bodySegments = [];
+    this.bodyLength = bodyLength;
+    
+    // Créer les anneaux du corps
+    for (let i = 0; i < bodyLength; i++) {
+      let segment = new BodySegment(x - (i + 1) * 15, y);
+      this.bodySegments.push(segment);
     }
   }
 
-  /**
-   * Set the movement direction of the snake head.
-   * @param {number} x - direction x (-1,0,1)
-   * @param {number} y - direction y (-1,0,1)
-   */
-  setDirection(x, y) {
-    this.direction.set(x, y);
-    this.direction.normalize();
+  // Faire arriver la tête vers une cible (la souris)
+  arrive(target, d = 0) {
+    return this.head.arrive(target, d);
   }
 
-  // ── Private helpers ───────────────────────────────────────────────
+  // Mettre à jour tous les composants du serpent
+  update() {
+    // Mettre à jour la langue
+    this.head.updateTongue();
+    
+    // Appliquer la force à la tête
+    this.head.update();
 
-  /**
-   * Track mouse movement to decide wander vs. seek.
-   */
-  _updateWanderState(mousePos) {
-    let moved = p5.Vector.dist(mousePos, this._mouseTarget) > 1.5;
+    // Chaque anneau suit l'anneau précédent à distance 30
+    for (let i = 0; i < this.bodySegments.length; i++) {
+      let target;
 
     if (moved) {
       this._idleTimer  = 0;

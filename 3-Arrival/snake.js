@@ -1,93 +1,73 @@
-// Fonction pour obtenir une couleur arc-en-ciel basée sur un indice
-function getRainbowColor(index, total) {
-  // Formule HSB pour créer l'arc-en-ciel
-  let hue = map(index, 0, total, 0, 360);
-  return color(hue, 100, 80);
-}
+// Snake.js
+// Manages a chain of SnakeSegment vehicles.
+// The head seeks/arrives at the mouse (or wanders when the mouse is idle).
+// Each following segment arrives at the position of the one ahead of it.
+//
+// Behaviors used from Vehicle (unmodified):
+//   - arrive()   → segments follow the chain
+//   - wander()   → head wanders when mouse hasn't moved
+//   - flee()     → whole snake flees a threat on right-click  (bonus)
+//   - boundaries() → keeps the snake on screen
 
-// HeadSnake - la tête du serpent, sous-classe de Vehicle
-class HeadSnake extends Vehicle {
-  constructor(x, y) {
-    super(x, y);
-    this.r = 12; // légèrement plus petite que la tête normale
-    this.tongueTime = 0; // Tracker pour la langue
-    this.tongueActive = false;
-    this.tonguePhase = 0; // Phase d'animation de la langue (0-1)
-  }
+class Snake {
+  /**
+   * @param {number} x             - Starting x (head)
+   * @param {number} y             - Starting y (head)
+   * @param {number} numSegments   - Total number of segments (head + body)
+   * @param {number} headRadius    - Radius of the head segment
+   */
+  constructor(x, y, numSegments = 20, headRadius = 20) {
+    this.segments = [];
 
-  // Mettre à jour l'état de la langue
-  updateTongue() {
-    this.tongueTime += deltaTime / 1000; // En secondes
-    
-    // Toutes les 3 secondes, activer la langue pour 0.5 secondes
-    if (this.tongueTime >= 3) {
-      this.tongueActive = true;
-      this.tonguePhase = 0;
-      this.tongueTime = 0;
-    }
-    
-    if (this.tongueActive) {
-      this.tonguePhase += deltaTime / 500; // Animation de 0.5s
-      if (this.tonguePhase > 1) {
-        this.tongueActive = false;
+    for (let i = 0; i < numSegments; i++) {
+      // Stagger the initial positions so segments don't stack at spawn
+      let seg = new SnakeSegment(x - i * headRadius * 1.5, y, i, headRadius);
+      this.segments.push(seg);
       }
+
+    // ── Movement state ────────────────────────────────────────────
+    // The snake head moves in a fixed direction controlled by keyboard.
+    this.direction = createVector(1, 0);
+
+    // Canvas boundary margin
+    this._boundaryMargin = 60;
+  }
+
+  // ── Public API ────────────────────────────────────────────────────
+
+  /**
+   * Call every frame from draw().
+   */
+  update() {
+    let head = this.segments[0];
+
+    // ── Head movement (keyboard-directed) ─────────────────────────
+    head.vel = this.direction.copy().mult(head.maxSpeed);
+    head.update();
+    head.edges();
+      
+    // ── Body steering ─────────────────────────────────────────────
+    for (let i = 1; i < this.segments.length; i++) {
+      let seg  = this.segments[i];
+      let prev = this.segments[i - 1];
+      
+      // Each segment arrives at the position of the one in front.
+      // The offset (50 px) creates a natural gap between segments.
+      let force = seg.arrive(prev.pos, 50);
+
+      let bf = seg.boundaries(
+        0, 0, width, height, this._boundaryMargin
+      );
+
+      seg.applyForce(force);
+      seg.applyForce(bf);
+      seg.update();
     }
   }
 
-  show() {
-    stroke("red"); // Rouge clair pour la tête
-    strokeWeight(2);
-    fill("red"); // Rouge pour la tête
-    push();
-    translate(this.pos.x, this.pos.y);
-    rotate(this.vel.heading());
-    triangle(-this.r, -this.r / 2, -this.r, this.r / 2, this.r, 0);
-    pop();
-    
-    // Dessiner la langue fourchue
-    this.drawTongue();
-  }
-
-  drawTongue() {
-    if (this.tongueActive) {
-      push();
-      translate(this.pos.x, this.pos.y);
-      rotate(this.vel.heading());
-      
-      // Animation sinusoidale de la langue
-      let tongueLength = 30 + sin(this.tonguePhase * PI) * 20;
-      
-      // Couleur jaune semi-transparente (HSB : hue=60 = jaune, saturation=100, brightness=100, alpha=180)
-      stroke(60, 100, 100, 180);
-      strokeWeight(3);
-      
-      // Langue fourchue - deux branches
-      let forkAngle = 0.4; // Angle entre les deux branches
-      
-      // Branche gauche
-      line(0, -5, tongueLength * cos(-forkAngle), tongueLength * sin(-forkAngle) - 5);
-      // Branche droite
-      line(0, 5, tongueLength * cos(forkAngle), tongueLength * sin(forkAngle) + 5);
-      
-      // Pointe de la langue
-      fill("yellow");
-      noStroke();
-      circle(tongueLength * cos(0), tongueLength * sin(0), 3);
-      
-      pop();
-    }
-  }
-}
-
-// BodySegment - anneau du corps, sous-classe de Vehicle
-class BodySegment extends Vehicle {
-  constructor(x, y) {
-    super(x, y);
-    this.r = 10;
-    this.sizeRatio = 1; // Ratio pour la diminution de taille
-    this.rainbowColor = color(0, 100, 100); // Couleur primaire
-  }
-
+  /**
+   * Draw the snake: body ribbon first, then segment circles on top.
+   */
   show() {
     // Utiliser la couleur arc-en-ciel assignée
     stroke(this.rainbowColor);
@@ -130,72 +110,55 @@ class Snake extends Vehicle {
     for (let i = 0; i < this.bodySegments.length; i++) {
       let target;
       
-      if (i === 0) {
-        // Le premier anneau suit la tête à 30 pixels
-        target = this.head.pos;
+    if (moved) {
+      this._idleTimer  = 0;
+      this._wandering  = false;
+      this._mouseTarget = mousePos.copy();
       } else {
-        // Les autres anneaux suivent le segment précédent à 30 pixels
-        target = this.bodySegments[i - 1].pos;
+      this._idleTimer++;
+      if (this._idleTimer >= this._idleThreshold) {
+        this._wandering = true;
       }
-
-      // Appliquer la force d'arrivée avec distance de freinage de 30
-      let steeringForce = this.bodySegments[i].arrive(target, 30);
-      this.bodySegments[i].applyForce(steeringForce);
-      this.bodySegments[i].update();
-      
-      // Mettre à jour le ratio de taille : diminue avec la distance par rapport à la tête
-      // Le premier anneau a un ratio de 1, le dernier a un ratio plus petit
-      this.bodySegments[i].sizeRatio = 1 - (i / this.bodyLength) * 0.7;
     }
   }
 
-  // Appliquer une force au serpent (surtout utile pour la tête)
-  applyForce(force) {
-    this.head.applyForce(force);
-  }
+  /**
+   * Draw a smooth filled ribbon connecting all segment centres.
+   * Uses beginShape / curveVertex for a smooth spline.
+   */
+  _drawRibbon() {
+    if (this.segments.length < 2) return;
 
-  // Afficher tous les composants du serpent
-  show() {
-    // Dessiner les lignes entre les anneaux avec couleurs arc-en-ciel
-    this.drawConnectingLines();
-    
-    // Afficher la tête
-    this.head.show();
-    
-    // Afficher les anneaux du corps avec leurs couleurs arc-en-ciel
-    for (let i = 0; i < this.bodySegments.length; i++) {
-      // Assigner la couleur arc-en-ciel à chaque anneau
-      this.bodySegments[i].rainbowColor = getRainbowColor(i, this.bodyLength);
-      this.bodySegments[i].show();
-    }
-  }
-
-  // Dessiner les lignes connectant la tête aux anneaux
-  drawConnectingLines() {
     push();
-    strokeWeight(20); // Deux fois le rayon (rayon = 10, donc 2*10 = 20)
-    
-    // Ligne de la tête au premier anneau - couleur 0
-    let hueVal = map(0, 0, this.bodyLength, 0, 360);
-    stroke(hueVal, 100, 80, 150); // Semi-transparente
-    line(this.head.pos.x, this.head.pos.y, this.bodySegments[0].pos.x, this.bodySegments[0].pos.y);
-    
-    // Lignes entre les anneaux - couleur i+1
-    for (let i = 0; i < this.bodySegments.length - 1; i++) {
-      let hueVal = map(i + 1, 0, this.bodyLength, 0, 360);
-      stroke(hueVal, 100, 80, 150); // Semi-transparente
-      line(this.bodySegments[i].pos.x, this.bodySegments[i].pos.y, 
-           this.bodySegments[i + 1].pos.x, this.bodySegments[i + 1].pos.y);
+    noFill();
+
+    // Draw the ribbon as a thick stroked curve whose weight tapers
+    // We approximate taper by drawing multiple overlapping curves
+    // from tail to head, getting thinner and brighter
+    let steps = 3;
+    for (let s = 0; s < steps; s++) {
+      let t        = s / (steps - 1);                       // 0 → 1
+      let sw       = lerp(this.segments[0].r * 1.6, 2, t); // thick → thin
+      let col      = lerpColor(
+        color(30, 80, 30, 180),
+        color(80, 220, 80, 220),
+        t
+      );
+      stroke(col);
+      strokeWeight(sw);
+
+      beginShape();
+      // Duplicate first and last point so curveVertex starts/ends cleanly
+      let first = this.segments[0].pos;
+      let last  = this.segments[this.segments.length - 1].pos;
+      curveVertex(first.x, first.y);
+      for (let seg of this.segments) {
+        curveVertex(seg.pos.x, seg.pos.y);
+      }
+      curveVertex(last.x, last.y);
+      endShape();
     }
     
     pop();
-  }
-
-  // Ajouter un anneau au serpent
-  addSegment() {
-    let lastSegment = this.bodySegments[this.bodySegments.length - 1];
-    let newSegment = new BodySegment(lastSegment.pos.x, lastSegment.pos.y);
-    this.bodySegments.push(newSegment);
-    this.bodyLength++;
   }
 }

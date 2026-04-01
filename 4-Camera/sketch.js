@@ -17,6 +17,12 @@ function setup() {
 function draw() {
   background(10, 42, 74);
 
+  // If start screen, just show HUD and return
+  if (gameManager.isStartScreen()) {
+    hud.show();
+    return;
+  }
+
   // Update game
   let mouseWorldPos = getMouseWorldPos();
   gameManager.update(mouseWorldPos);
@@ -33,7 +39,7 @@ function draw() {
   pop();
 
   // Camera follows player
-  if (!gameManager.isGameOver()) {
+  if (!gameManager.isGameOver() && !gameManager.isWon()) {
     camera.follow(gameManager.getPlayer());
   }
 
@@ -54,9 +60,15 @@ function keyPressed() {
   if (key === 'd' || key === 'D') {
     Vehicle.debug = !Vehicle.debug;
   }
-  if ((key === 'r' || key === 'R') && gameManager.isGameOver()) {
+  if ((key === 'r' || key === 'R') && (gameManager.isGameOver() || gameManager.isWon())) {
     gameManager.restart();
     camera.pos.set(gameManager.getPlayer().pos.x, gameManager.getPlayer().pos.y);
+  }
+}
+
+function mousePressed() {
+  if (gameManager.isStartScreen()) {
+    gameManager.startGame();
   }
 }
 

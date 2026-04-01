@@ -1,13 +1,23 @@
 class AIFish extends Vehicle {
-  constructor(x, y, type, size) {
+  constructor(x, y, type, size, depthFactor = 0) {
     super(x, y);
     this.type = type; // 'prey', 'neutral', 'predator'
     this.size = size;
-    this.maxSpeed = random(1, 3);
+    this.depthFactor = depthFactor; // 0 to 1 based on y/3000
+    
+    // Set maxSpeed based on base and depth factor
+    this.maxSpeed = random(1.5, 2.5) + depthFactor;
     this.maxForce = 0.05;
     this.fleeDistance = 100;
     this.pursueDistance = 150;
     this.neighborDist = 50;
+    
+    // Calculate aggression multiplier for predators
+    if (this.type === 'predator') {
+      this.aggressionMultiplier = 1.0 + (this.size / 35) * 0.5;
+    } else {
+      this.aggressionMultiplier = 1.0;
+    }
   }
 
   computeBehaviorForce(player, preyArray = null) {
@@ -32,7 +42,8 @@ class AIFish extends Vehicle {
     } else if (this.type === 'predator') {
       // Wander normally, but pursue if player is smaller and close
       force = this.wander();
-      if (player && player.getRadius() < this.size && p5.Vector.dist(this.pos, player.pos) < this.pursueDistance) {
+      let adjustedPursueDistance = this.pursueDistance * this.aggressionMultiplier;
+      if (player && player.getRadius() < this.size && p5.Vector.dist(this.pos, player.pos) < adjustedPursueDistance) {
         let pursueForce = this.pursue(player);
         force.add(pursueForce);
       }
@@ -134,7 +145,7 @@ class AIFish extends Vehicle {
     super.update();
   }
 
-  show() {
+  show(playerSize) {
     push();
     translate(this.pos.x, this.pos.y);
     if (this.vel.mag() > 0.1) {
@@ -153,11 +164,90 @@ class AIFish extends Vehicle {
       stroke(200, 50, 50);
     }
 
-    strokeWeight(2);
-    ellipse(0, 0, this.size * 2, this.size);
+    // Add glow effect for deep zones
+    if (this.pos.y > 1500) {
+      if (this.type === 'predator') {
+        drawingContext.shadowColor = 'rgba(255, 100, 100, 0.6)';
+      } else if (this.type === 'prey') {
+        drawingContext.shadowColor = 'rgba(0, 255, 255, 0.6)';
+      } else {
+        drawingContext.shadowColor = 'rgba(150, 255, 150, 0.6)';
+      }
+      drawingContext.shadowBlur = 15;
+    }
 
-    // Simple fin
-    triangle(this.size * 0.5, 0, this.size, -this.size * 0.3, this.size, this.size * 0.3);
+    strokeWeight(2);
+
+    // Fish forms by type (width/detail)
+    let widthFactor = 2.0;
+    let bodyCurveY = this.size;
+    if (this.type === 'predator') {
+      widthFactor = 2.5;
+      bodyCurveY = this.size * 1.2;
+    } else if (this.type === 'prey') {
+      widthFactor = 1.6;
+      bodyCurveY = this.size * 0.8;
+    } else if (this.type === 'neutral') {
+      widthFactor = 2.0;
+      bodyCurveY = this.size;
+    }
+
+    beginShape();
+    curveVertex(-this.size * widthFactor * 0.55, 0);
+    curveVertex(-this.size * widthFactor * 0.55, 0);
+    curveVertex(-this.size * 0.3, -bodyCurveY * 0.8);
+    curveVertex(this.size * 0.7, -bodyCurveY * 0.4);
+    curveVertex(this.size * 1.1, 0);
+    curveVertex(this.size * 0.7, bodyCurveY * 0.4);
+    curveVertex(-this.size * 0.3, bodyCurveY * 0.8);
+    curveVertex(-this.size * widthFactor * 0.55, 0);
+    curveVertex(-this.size * widthFactor * 0.55, 0);
+    endShape();
+
+    // Tail variations in same style
+    noStroke();
+    if (this.type === 'predator') {
+      fill(230, 80, 80);
+    } else if (this.type === 'prey') {
+      fill(255, 220, 140);
+    } else {
+      fill(160, 255, 170);
+    }
+    triangle(-this.size * 0.9, 0, -this.size * 1.6, -this.size * 0.5, -this.size * 1.6, 0);
+    triangle(-this.size * 0.9, 0, -this.size * 1.6, this.size * 0.5, -this.size * 1.6, 0);
+
+    // Belly highlight
+    noStroke();
+    fill(255, 255, 255, 120);
+    ellipse(this.size * 0.15, this.size * 0.05, this.size * 1.1, this.size * 0.55);
+
+    // Small eye
+    fill(255);
+    ellipse(this.size * 0.5, -this.size * 0.1, this.size * 0.2, this.size * 0.2);
+    fill(0);
+    ellipse(this.size * 0.55, -this.size * 0.1, this.size * 0.08, this.size * 0.08);
+
+    // Reset glow
+    if (this.pos.y > 1500) {
+      drawingContext.shadowBlur = 0;
+    }
+
+    // Draw relationship indicator ring (debug only)
+    if (Vehicle.debug) {
+      if (playerSize > this.size * 1.2) {
+        // Player can eat this fish - green ring
+        stroke(0, 255, 100);
+        strokeWeight(1);
+        noFill();
+        circle(0, 0, this.size * 2 + 4);
+      } else if (this.size > playerSize * 1.2) {
+        // This fish can eat player - red ring
+        stroke(255, 100, 100);
+        strokeWeight(1);
+        noFill();
+        circle(0, 0, this.size * 2 + 4);
+      }
+    }
 
     pop();
   }

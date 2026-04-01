@@ -184,7 +184,12 @@ class Vehicle {
   }
 
   flee(target) {
-    // recopier code de flee de l'exemple précédent
+    // Flee from target: desired velocity away from target
+    let desired = p5.Vector.sub(this.pos, target);
+    desired.setMag(this.maxSpeed);
+    let force = p5.Vector.sub(desired, this.vel);
+    force.limit(this.maxForce);
+    return force;
   }
 
   seek(target, arrival = false, d=0) {
@@ -260,16 +265,6 @@ class Vehicle {
 
     triangle(-this.r, -this.r / 2, -this.r, this.r / 2, this.r, 0);
     pop();
-    /*
-   push();
-   // on dessine le vehicule comme un cercle
-   fill("blue");
-   stroke("white");
-   strokeWeight(2);
-   translate(this.pos.x, this.pos.y);
-   circle(0, 0, this.r * 2);  
-   pop();
-   */
   }
 
   edges() {
@@ -303,3 +298,4 @@ class Target extends Vehicle {
     pop();
   }
 }
+
